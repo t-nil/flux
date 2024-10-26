@@ -1979,6 +1979,10 @@ fn conv_sort_path(
         fhir::SortRes::User { name } => rty::SortCtor::User { name },
         fhir::SortRes::Adt(def_id) => {
             let sort_def = genv.adt_sort_def_of(def_id)?;
+            let generics = genv.generics_of(def_id)?;
+            if !path_generics_correct(path, generics) {
+                return Err(QueryErr::InvalidGenericArg { def_id });
+            }
             rty::SortCtor::Adt(sort_def)
         }
     };
@@ -1987,7 +1991,23 @@ fn conv_sort_path(
         .iter()
         .map(|t| conv_sort(genv, t, next_infer_sort))
         .try_collect()?;
+
     Ok(rty::Sort::app(ctor, args))
+}
+
+fn path_generics_correct(path: &fhir::SortPath, sort_generics: rty::Generics) -> bool {
+    // Check that the number of generics for a path are correct
+    //
+    // Note: We include base when collecting generics (i.e. T as base) for a def id
+    // because often times there are refinements over these types (see extern spec for iter
+    // as an example)
+    //
+    if path.args.len() != sort_generics.own_default_count_with_base() {
+        // make sure that
+        false
+    } else {
+        true
+    }
 }
 
 fn conv_poly_func_sort(
